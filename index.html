@@ -1,47 +1,50 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset = "utf-8">
-    <style>
-      #fs {
-        display: flex;
-        justify-content: center;
-        margin: 0 auto;
-        width: 100%;
-      }
-      .buttonrow1 {
-        display: flex;
-        flex-grow: 1;
-        height: 100px;
-        justify-content: center;
-      }
-    </style>
+  <meta charset="utf-8">
   <style>
     body {
       font-family: sans-serif;
       padding: 20px;
       background: #f0f0f0;
     }
+
     #container {
-      max-width: 800px; /* optional, for nicer width */
+      max-width: 800px;
       margin: 0 auto;
     }
+
+    /* Fullscreen button row */
     #fs {
       display: flex;
       justify-content: center;
+      align-items: center;
       margin-bottom: 10px;
       gap: 10px;
     }
     #fs button {
-      flex: 1; /* buttons share width equally */
+      flex: 1;
       height: 50px;
+      font-size: 16px;
+      cursor: pointer;
     }
+
+    /* Font selector row */
+    #fonts {
+      width: 100%;
+      height: 40px;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+
     textarea {
       width: 100%;
       height: 400px;
       font-size: 16px;
       padding: 10px;
+      resize: vertical;
     }
+
     #editor {
       font-size: 11px;
     }
@@ -53,23 +56,23 @@
       <button id="fsbtn">Enter Fullscreen</button>
       <button onclick="document.exitFullscreen()">Exit Fullscreen</button>
     </div>
-    <textarea id="editor" placeholder="Type Here..." style="font-family: Comic Sans MS"></textarea>
-  </div>
-    <script>
-let fsBtn = document.getElementById("fsbtn");
-fsBtn.addEventListener("click", () => {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch((err) => {
-            window.open("", "_blank");
-            window.close();
-        });
-    }
-});
-    </script>
 
+    <!-- font selector -->
+    <select id="fonts">
+      <option value="Comic Sans MS">Comic Sans MS</option>
+      <option value="Arial">Arial</option>
+      <option value="Verdana">Verdana</option>
+      <option value="Times New Roman">Times New Roman</option>
+      <option value="Courier New">Courier New</option>
+      <option value="monospace">Monospace</option>
+    </select>
+
+    <textarea id="editor" placeholder="Type Here..."></textarea>
+  </div>
+
+  <!-- Fullscreen logic -->
   <script>
-    // Fullscreen logic (unchanged)
-    let fsBtn = document.getElementById("fsbtn");
+    const fsBtn = document.getElementById("fsbtn");
     fsBtn.addEventListener("click", () => {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch((err) => {
@@ -80,11 +83,13 @@ fsBtn.addEventListener("click", () => {
     });
   </script>
 
+  <!-- Yjs collaboration + persistence -->
   <script type="module">
     import * as Y from 'https://cdn.jsdelivr.net/npm/yjs@13.8.13/dist/yjs.mjs';
     import { WebrtcProvider } from 'https://cdn.jsdelivr.net/npm/y-webrtc@10.0.7/dist/y-webrtc.mjs';
     import { IndexeddbPersistence } from 'https://cdn.jsdelivr.net/npm/y-indexeddb@1.2.4/dist/y-indexeddb.mjs';
 
+    // Get or create document ID
     let docId = location.hash.slice(1);
     if (!docId) {
       docId = Math.random().toString(36).slice(2, 10);
@@ -92,18 +97,20 @@ fsBtn.addEventListener("click", () => {
     }
 
     const doc = new Y.Doc();
+    const ytext = doc.getText('shared-text');
+    const ystyle = doc.getMap("style");
+
     const persistence = new IndexeddbPersistence(docId, doc);
+    const provider = new WebrtcProvider(docId, doc);
 
     const textarea = document.getElementById('editor');
     const fontel = document.getElementById('fonts');
 
+    // Load existing text from IndexedDB
     persistence.whenSynced.then(() => {
       console.log('Document loaded from IndexedDB!');
       textarea.value = ytext.toString();
     });
-
-    const provider = new WebrtcProvider(docId, doc);
-    const ytext = doc.getText('shared-text');
 
     // Update Yjs document as user types
     textarea.addEventListener('input', () => {
@@ -115,15 +122,11 @@ fsBtn.addEventListener("click", () => {
 
     // Reflect Yjs changes in textarea
     ytext.observe(() => {
-      const current = textarea.value;
       const newText = ytext.toString();
-      if (current !== newText) {
+      if (textarea.value !== newText) {
         textarea.value = newText;
       }
     });
-
-    // Shared map for styles
-    const ystyle = doc.getMap("style");
 
     // Apply current shared font when joining
     const currentFont = ystyle.get("fontFamily") || fontel.value;
