@@ -9,94 +9,97 @@
   </style>
 </head>
 <body>
-  <textarea id="editor" placeholder="Type Here..." style = `font-family: Comic Sans MS`></textarea>
-  <button id = "fsbtn">Enter Fullscreen</button>
-  <button onclick = "document.exitFullscreen()">Exit Fullscreen</button>
-  <select id = "fonts">
+  <textarea id="editor" placeholder="Type Here..." style="font-family: Comic Sans MS"></textarea>
+  <button id="fsbtn">Enter Fullscreen</button>
+  <button onclick="document.exitFullscreen()">Exit Fullscreen</button>
+  <select id="fonts">
     <option>serif</option>
     <option>sans-serif</option>
     <option>monospace</option>
     <option>cursive</option>
     <option selected>Comic Sans MS</option>
-    <option>fantasty</option>
+    <option>fantasy</option>
     <option>system-ui</option>
   </select>
-    <script>
-let fsBtn = document.getElementById("fsbtn");
-let fontel = document.getElementById("fonts");
-fsBtn.addEventListener("click", () => {
-    if (!document.fullscreenElement) {
+
+  <script>
+    // Fullscreen logic (unchanged)
+    let fsBtn = document.getElementById("fsbtn");
+    fsBtn.addEventListener("click", () => {
+      if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch((err) => {
-            window.open("", "_blank");
-            window.close();
+          window.open("", "_blank");
+          window.close();
         });
-    }
-});
-      
-    </script>
+      }
+    });
+  </script>
+
   <script type="module">
-    import * as Y from 'https://cdn.jsdelivr.net/npm/yjs@13.8.13/dist/yjs.mjs'
-    import { WebrtcProvider } from 'https://cdn.jsdelivr.net/npm/y-webrtc@10.0.7/dist/y-webrtc.mjs'
-    import { IndexeddbPersistence } from 'https://cdn.jsdelivr.net/npm/y-indexeddb@1.2.4/dist/y-indexeddb.mjs'
+    import * as Y from 'https://cdn.jsdelivr.net/npm/yjs@13.8.13/dist/yjs.mjs';
+    import { WebrtcProvider } from 'https://cdn.jsdelivr.net/npm/y-webrtc@10.0.7/dist/y-webrtc.mjs';
+    import { IndexeddbPersistence } from 'https://cdn.jsdelivr.net/npm/y-indexeddb@1.2.4/dist/y-indexeddb.mjs';
 
-    let docId = location.hash.slice(1)
+    let docId = location.hash.slice(1);
     if (!docId) {
-      docId = Math.random().toString(36).slice(2, 10)
-      location.hash = docId
+      docId = Math.random().toString(36).slice(2, 10);
+      location.hash = docId;
     }
 
-    const doc = new Y.Doc()
-    const persistence = new IndexeddbPersistence(docId, doc)
+    const doc = new Y.Doc();
+    const persistence = new IndexeddbPersistence(docId, doc);
+
+    const textarea = document.getElementById('editor');
+    const fontel = document.getElementById('fonts');
 
     persistence.whenSynced.then(() => {
-      console.log('Document loaded from IndexedDB!')
-      textarea.value = ytext.toString() // load initial text
-    })
+      console.log('Document loaded from IndexedDB!');
+      textarea.value = ytext.toString();
+    });
 
-    const provider = new WebrtcProvider(docId, doc)
-    const ytext = doc.getText('shared-text')
-    const textarea = document.getElementById('editor')
+    const provider = new WebrtcProvider(docId, doc);
+    const ytext = doc.getText('shared-text');
 
     // Update Yjs document as user types
     textarea.addEventListener('input', () => {
-      // Compute diff instead of deleting everything
       ytext.doc.transact(() => {
-        ytext.delete(0, ytext.length)
-        ytext.insert(0, textarea.value)
-      })
-    })
+        ytext.delete(0, ytext.length);
+        ytext.insert(0, textarea.value);
+      });
+    });
 
     // Reflect Yjs changes in textarea
-    ytext.observe(event => {
-      const current = textarea.value
-      const newText = ytext.toString()
+    ytext.observe(() => {
+      const current = textarea.value;
+      const newText = ytext.toString();
       if (current !== newText) {
-        textarea.value = newText
+        textarea.value = newText;
       }
-    })
-    // shared map for styles
-const ystyle = ydoc.getMap("style");
+    });
 
-// Apply current shared font when joining
-const currentFont = ystyle.get("fontFamily") || fontel.value;
-document.getElementById("editor").style.fontFamily = currentFont;
-fontel.value = currentFont;
+    // Shared map for styles
+    const ystyle = doc.getMap("style");
 
-// Listen for changes from peers
-ystyle.observe(() => {
-  const font = ystyle.get("fontFamily");
-  if (font) {
-    document.getElementById("editor").style.fontFamily = font;
-    fontel.value = font;
-  }
-});
+    // Apply current shared font when joining
+    const currentFont = ystyle.get("fontFamily") || fontel.value;
+    textarea.style.fontFamily = currentFont;
+    fontel.value = currentFont;
 
-// Update shared font when user selects a new font
-fontel.addEventListener("change", () => {
-  const font = fontel.value;
-  document.getElementById("editor").style.fontFamily = font;
-  ystyle.set("fontFamily", font); // broadcast to peers
-});
+    // Listen for changes from peers
+    ystyle.observe(() => {
+      const font = ystyle.get("fontFamily");
+      if (font) {
+        textarea.style.fontFamily = font;
+        fontel.value = font;
+      }
+    });
+
+    // Update shared font when user selects a new font
+    fontel.addEventListener("change", () => {
+      const font = fontel.value;
+      textarea.style.fontFamily = font;
+      ystyle.set("fontFamily", font);
+    });
   </script>
 </body>
 </html>
