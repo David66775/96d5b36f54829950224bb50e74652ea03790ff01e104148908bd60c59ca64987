@@ -17,16 +17,44 @@
       }
     </style>
   <style>
-    body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
-    textarea { width: 100%; height: 400px; font-size: 16px; padding: 10px; }
-    #editor { font-size: 11px; }
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #f0f0f0;
+    }
+    #container {
+      max-width: 800px; /* optional, for nicer width */
+      margin: 0 auto;
+    }
+    #fs {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+      gap: 10px;
+    }
+    #fs button {
+      flex: 1; /* buttons share width equally */
+      height: 50px;
+    }
+    textarea {
+      width: 100%;
+      height: 400px;
+      font-size: 16px;
+      padding: 10px;
+    }
+    #editor {
+      font-size: 11px;
+    }
   </style>
 </head>
 <body>
-  <div id = "fs">
-      <button id = "fsbtn" class = "buttonrow1">Enter Fullscreen</button>
-      <button onclick = "document.exitFullscreen()" class = "buttonrow1">Exit Fullscreen</button>
+  <div id="container">
+    <div id="fs">
+      <button id="fsbtn">Enter Fullscreen</button>
+      <button onclick="document.exitFullscreen()">Exit Fullscreen</button>
     </div>
+    <textarea id="editor" placeholder="Type Here..." style="font-family: Comic Sans MS"></textarea>
+  </div>
     <script>
 let fsBtn = document.getElementById("fsbtn");
 fsBtn.addEventListener("click", () => {
@@ -38,7 +66,6 @@ fsBtn.addEventListener("click", () => {
     }
 });
     </script>
-  <textarea id="editor" placeholder="Type Here..." style="font-family: Comic Sans MS"></textarea>
 
   <script>
     // Fullscreen logic (unchanged)
