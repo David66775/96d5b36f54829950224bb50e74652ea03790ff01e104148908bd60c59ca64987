@@ -10,6 +10,19 @@
 </head>
 <body>
   <textarea id="editor" placeholder="Type Here..."></textarea>
+  <button id = "fsbtn">Enter Fullscreen</button>
+    <button onclick = "document.exitFullscreen()">Exit Fullscreen</button>
+    <script>
+let fsBtn = document.getElementById("fsbtn");
+fsBtn.addEventListener("click", () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch((err) => {
+            window.open("", "_blank");
+            window.close();
+        });
+    }
+});
+    </script>
   <script type="module">
     import * as Y from 'https://cdn.jsdelivr.net/npm/yjs@13.8.13/dist/yjs.mjs'
     import { WebrtcProvider } from 'https://cdn.jsdelivr.net/npm/y-webrtc@10.0.7/dist/y-webrtc.mjs'
