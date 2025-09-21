@@ -88,6 +88,7 @@
     import * as Y from 'https://cdn.jsdelivr.net/npm/yjs@13.8.13/dist/yjs.mjs';
     import { WebrtcProvider } from 'https://cdn.jsdelivr.net/npm/y-webrtc@10.0.7/dist/y-webrtc.mjs';
     import { IndexeddbPersistence } from 'https://cdn.jsdelivr.net/npm/y-indexeddb@1.2.4/dist/y-indexeddb.mjs';
+    import { yTextAreaBinding } from 'https://cdn.jsdelivr.net/npm/yjs-utils@0.0.4/dist/yjs-utils.min.js';
 
     // Get or create document ID
     let docId = location.hash.slice(1);
@@ -106,34 +107,21 @@
     const textarea = document.getElementById('editor');
     const fontel = document.getElementById('fonts');
 
+    // --- Text Binding (auto-sync between Yjs & textarea) ---
+    yTextAreaBinding(ytext, textarea);
+
     // Load existing text from IndexedDB
     persistence.whenSynced.then(() => {
       console.log('Document loaded from IndexedDB!');
-      textarea.value = ytext.toString();
     });
 
-    // Update Yjs document as user types
-    textarea.addEventListener('input', () => {
-      ytext.doc.transact(() => {
-        ytext.delete(0, ytext.length);
-        ytext.insert(0, textarea.value);
-      });
-    });
+    // --- Font Sync ---
+    // Apply saved font when joining
+    const savedFont = ystyle.get("fontFamily") || fontel.value;
+    textarea.style.fontFamily = savedFont;
+    fontel.value = savedFont;
 
-    // Reflect Yjs changes in textarea
-    ytext.observe(() => {
-      const newText = ytext.toString();
-      if (textarea.value !== newText) {
-        textarea.value = newText;
-      }
-    });
-
-    // Apply current shared font when joining
-    const currentFont = ystyle.get("fontFamily") || fontel.value;
-    textarea.style.fontFamily = currentFont;
-    fontel.value = currentFont;
-
-    // Listen for changes from peers
+    // Update font if another peer changes it
     ystyle.observe(() => {
       const font = ystyle.get("fontFamily");
       if (font) {
