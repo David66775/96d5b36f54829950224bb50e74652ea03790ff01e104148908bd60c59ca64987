@@ -1,35 +1,34 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
+  <title>Persistent Editor (localStorage + Yjs fallback)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body {
       font-family: sans-serif;
       padding: 20px;
       background: #f0f0f0;
     }
-
     #container {
-      max-width: 800px;
+      max-width: 900px;
       margin: 0 auto;
     }
 
-    /* Fullscreen button row */
-    #fs {
+    /* Fullscreen + control row */
+    #controls {
       display: flex;
-      justify-content: center;
-      align-items: center;
-      margin-bottom: 10px;
       gap: 10px;
+      margin-bottom: 10px;
     }
-    #fs button {
+    #controls button {
       flex: 1;
-      height: 50px;
-      font-size: 16px;
+      height: 46px;
+      font-size: 15px;
       cursor: pointer;
     }
 
-    /* Font selector row */
+    /* Font selector */
     #fonts {
       width: 100%;
       height: 40px;
@@ -39,26 +38,23 @@
 
     textarea {
       width: 100%;
-      height: 400px;
+      min-height: 360px;
       font-size: 16px;
       padding: 10px;
       resize: vertical;
-    }
-
-    #editor {
-      font-size: 11px;
+      box-sizing: border-box;
     }
   </style>
 </head>
 <body>
   <div id="container">
-    <div id="fs">
+    <div id="controls">
       <button id="fsbtn">Enter Fullscreen</button>
-      <button onclick="document.exitFullscreen()">Exit Fullscreen</button>
+      <button id="exitfsbtn">Exit Fullscreen</button>
+      <button id="clearBtn">Clear Text</button>
     </div>
 
-    <!-- font selector -->
-    <select id="fonts">
+    <select id="fonts" aria-label="Choose font">
       <option value="Comic Sans MS">Comic Sans MS</option>
       <option value="Arial">Arial</option>
       <option value="Verdana">Verdana</option>
@@ -67,75 +63,171 @@
       <option value="monospace">Monospace</option>
     </select>
 
-    <textarea id="editor" placeholder="Type Here..."></textarea>
+    <textarea id="editor" placeholder="Type here..."></textarea>
   </div>
 
-  <!-- Fullscreen logic -->
   <script>
-    const fsBtn = document.getElementById("fsbtn");
-    fsBtn.addEventListener("click", () => {
+    // fullscreen buttons
+    const fsBtn = document.getElementById('fsbtn');
+    const exitFsBtn = document.getElementById('exitfsbtn');
+
+    fsBtn.addEventListener('click', () => {
       if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch((err) => {
-          window.open("", "_blank");
+        document.documentElement.requestFullscreen().catch(() => {
+          // fallback attempt from your older code, but won't work reliably in browsers
+          window.open('', '_blank');
           window.close();
         });
       }
     });
+
+    exitFsBtn.addEventListener('click', () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+    });
   </script>
 
-  <!-- Yjs collaboration + persistence -->
   <script type="module">
-    import * as Y from 'https://cdn.jsdelivr.net/npm/yjs@13.8.13/dist/yjs.mjs';
-    import { WebrtcProvider } from 'https://cdn.jsdelivr.net/npm/y-webrtc@10.0.7/dist/y-webrtc.mjs';
-    import { IndexeddbPersistence } from 'https://cdn.jsdelivr.net/npm/y-indexeddb@1.2.4/dist/y-indexeddb.mjs';
-    import { yTextAreaBinding } from 'https://cdn.jsdelivr.net/npm/yjs-utils@0.0.4/dist/yjs-utils.min.js';
-
-    // Get or create document ID
-    let docId = location.hash.slice(1);
-    if (!docId) {
-      docId = Math.random().toString(36).slice(2, 10);
-      location.hash = docId;
-    }
-
-    const doc = new Y.Doc();
-    const ytext = doc.getText('shared-text');
-    const ystyle = doc.getMap("style");
-
-    const persistence = new IndexeddbPersistence(docId, doc);
-    const provider = new WebrtcProvider(docId, doc);
+  (async () => {
+    // Keys for localStorage
+    const LS_KEY = 'editor_content_v1';
+    const LS_FONT = 'editor_font_v1';
 
     const textarea = document.getElementById('editor');
     const fontel = document.getElementById('fonts');
+    const clearBtn = document.getElementById('clearBtn');
 
-    // --- Text Binding (auto-sync between Yjs & textarea) ---
-    yTextAreaBinding(ytext, textarea);
+    // --- Load immediately from localStorage so refresh shows content instantly ---
+    textarea.value = localStorage.getItem(LS_KEY) || '';
+    const savedFont = localStorage.getItem(LS_FONT);
+    if (savedFont) {
+      textarea.style.fontFamily = savedFont;
+      fontel.value = savedFont;
+    } else {
+      // ensure UI and textarea start consistent
+      fontel.value = fontel.value || window.getComputedStyle(textarea).fontFamily;
+      textarea.style.fontFamily = fontel.value;
+    }
 
-    // Load existing text from IndexedDB
-    persistence.whenSynced.then(() => {
-      console.log('Document loaded from IndexedDB!');
+    // Save locally on every change (fast, reliable)
+    textarea.addEventListener('input', () => {
+      try { localStorage.setItem(LS_KEY, textarea.value); } catch(e) { /* storage full/blocked */ }
+      // if Yjs is available, we'll update it via a flag below
+      if (typeof updateYTextFromTextarea === 'function') updateYTextFromTextarea();
     });
 
-    // --- Font Sync ---
-    // Apply saved font when joining
-    const savedFont = ystyle.get("fontFamily") || fontel.value;
-    textarea.style.fontFamily = savedFont;
-    fontel.value = savedFont;
-
-    // Update font if another peer changes it
-    ystyle.observe(() => {
-      const font = ystyle.get("fontFamily");
-      if (font) {
-        textarea.style.fontFamily = font;
-        fontel.value = font;
+    fontel.addEventListener('change', () => {
+      const font = fontel.value;
+      textarea.style.fontFamily = font;
+      try { localStorage.setItem(LS_FONT, font); } catch(e) {}
+      if (typeof ystyle !== 'undefined' && ystyle) {
+        try { ystyle.set('fontFamily', font); } catch(e) {}
       }
     });
 
-    // Update shared font when user selects a new font
-    fontel.addEventListener("change", () => {
-      const font = fontel.value;
-      textarea.style.fontFamily = font;
-      ystyle.set("fontFamily", font);
+    clearBtn.addEventListener('click', () => {
+      textarea.value = '';
+      try { localStorage.removeItem(LS_KEY); } catch(e) {}
+      if (typeof ytext !== 'undefined' && ytext && typeof ydoc !== 'undefined' && ydoc) {
+        try {
+          ydoc.transact(() => { ytext.delete(0, ytext.length); });
+        } catch(e) {}
+      }
     });
+
+    // ----- Try to load Yjs + webrtc + indexeddb (optional) -----
+    // These modules sometimes fail to load due to network/CSP/CORS or when opened via file://.
+    // The code below falls back to localStorage if they fail.
+    let ydoc, ytext, ystyle, provider, persistence;
+    // helper fn that may be overwritten once Yjs ready
+    window.updateYTextFromTextarea = null;
+
+    try {
+      const Ymod = await import('https://cdn.jsdelivr.net/npm/yjs@13.8.13/dist/yjs.mjs');
+      const wmod = await import('https://cdn.jsdelivr.net/npm/y-webrtc@10.0.7/dist/y-webrtc.mjs');
+      const idbmod = await import('https://cdn.jsdelivr.net/npm/y-indexeddb@1.2.4/dist/y-indexeddb.mjs');
+
+      const Y = Ymod;
+      const WebrtcProvider = wmod.WebrtcProvider;
+      const IndexeddbPersistence = idbmod.IndexeddbPersistence;
+
+      // doc id from hash (persist across reload of same tab if you keep hash)
+      let docId = location.hash.slice(1);
+      if (!docId) {
+        docId = Math.random().toString(36).slice(2, 10);
+        location.hash = docId;
+      }
+
+      ydoc = new Y.Doc();
+      ytext = ydoc.getText('shared-text');
+      ystyle = ydoc.getMap('style');
+
+      provider = new WebrtcProvider(docId, ydoc);
+      persistence = new IndexeddbPersistence(docId, ydoc);
+
+      // When IndexedDB finishes loading, prefer Yjs content if it has something useful.
+      persistence.whenSynced.then(() => {
+        const fromY = ytext.toString();
+        if (fromY && fromY !== textarea.value) {
+          // adopt Yjs content (and persist it locally)
+          textarea.value = fromY;
+          try { localStorage.setItem(LS_KEY, fromY); } catch(e) {}
+        }
+      }).catch(e => {
+        // ignore, we'll still have localStorage
+        console.warn('IndexeddbPersistence.whenSynced failed:', e);
+      });
+
+      // Observe ytext changes and apply to textarea (preserve caret if possible)
+      ytext.observe(() => {
+        const newText = ytext.toString();
+        if (textarea.value !== newText) {
+          const selStart = textarea.selectionStart;
+          const selEnd = textarea.selectionEnd;
+          textarea.value = newText;
+          try { textarea.setSelectionRange(selStart, selEnd); } catch (e) {}
+          try { localStorage.setItem(LS_KEY, newText); } catch(e) {}
+        }
+      });
+
+      // Update ytext from textarea (used on input)
+      window.updateYTextFromTextarea = () => {
+        try {
+          ydoc.transact(() => {
+            ytext.delete(0, ytext.length);
+            ytext.insert(0, textarea.value);
+          });
+        } catch (e) {
+          console.warn('Failed to update ytext:', e);
+        }
+      };
+
+      // --- Font sync: prefer Yjs-stored font, otherwise push local font to Yjs ---
+      const fontFromY = ystyle.get('fontFamily');
+      if (fontFromY) {
+        textarea.style.fontFamily = fontFromY;
+        fontel.value = fontFromY;
+        try { localStorage.setItem(LS_FONT, fontFromY); } catch(e) {}
+      } else {
+        // nothing in Yjs yet: write local font into Yjs (so peers will get it)
+        const localF = localStorage.getItem(LS_FONT) || fontel.value;
+        try { ystyle.set('fontFamily', localF); } catch(e) {}
+      }
+
+      ystyle.observe(() => {
+        const font = ystyle.get('fontFamily');
+        if (font && font !== textarea.style.fontFamily) {
+          textarea.style.fontFamily = font;
+          fontel.value = font;
+          try { localStorage.setItem(LS_FONT, font); } catch(e) {}
+        }
+      });
+
+      console.log('Yjs loaded and bound (if network allows). LocalStorage remains primary fallback.');
+    } catch (err) {
+      console.warn('Yjs modules failed to load (editor will still use localStorage):', err);
+      // leave updateYTextFromTextarea null — localStorage already handles saving
+    }
+  })();
   </script>
 </body>
 </html>
