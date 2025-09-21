@@ -5,11 +5,7 @@
   <style>
     body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
     textarea { width: 100%; height: 400px; font-size: 16px; padding: 10px; }
-    #info { margin-bottom: 10px; }
-    #editor {
-      font-size: 11px;
-      font-family: "Comic Sans MS";
-    }
+    #editor { font-size: 11px; font-family: "Comic Sans MS"; }
   </style>
 </head>
 <body>
@@ -18,26 +14,40 @@
     import * as Y from 'https://cdn.jsdelivr.net/npm/yjs@13.8.13/dist/yjs.mjs'
     import { WebrtcProvider } from 'https://cdn.jsdelivr.net/npm/y-webrtc@10.0.7/dist/y-webrtc.mjs'
     import { IndexeddbPersistence } from 'https://cdn.jsdelivr.net/npm/y-indexeddb@1.2.4/dist/y-indexeddb.mjs'
+
     let docId = location.hash.slice(1)
     if (!docId) {
       docId = Math.random().toString(36).slice(2, 10)
       location.hash = docId
     }
+
     const doc = new Y.Doc()
     const persistence = new IndexeddbPersistence(docId, doc)
+
     persistence.whenSynced.then(() => {
       console.log('Document loaded from IndexedDB!')
+      textarea.value = ytext.toString() // load initial text
     })
+
     const provider = new WebrtcProvider(docId, doc)
     const ytext = doc.getText('shared-text')
     const textarea = document.getElementById('editor')
+
+    // Update Yjs document as user types
     textarea.addEventListener('input', () => {
-      ytext.delete(0, ytext.length)
-      ytext.insert(0, textarea.value)
+      // Compute diff instead of deleting everything
+      ytext.doc.transact(() => {
+        ytext.delete(0, ytext.length)
+        ytext.insert(0, textarea.value)
+      })
     })
-    ytext.observe(() => {
-      if (textarea.value !== ytext.toString()) {
-        textarea.value = ytext.toString()
+
+    // Reflect Yjs changes in textarea
+    ytext.observe(event => {
+      const current = textarea.value
+      const newText = ytext.toString()
+      if (current !== newText) {
+        textarea.value = newText
       }
     })
   </script>
